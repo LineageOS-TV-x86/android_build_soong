@@ -141,13 +141,16 @@ func (b *bootimg) buildBootImage(ctx android.ModuleContext, vendor bool) android
 		return output
 	}
 	if kernel != "" {
-		cmd.FlagWithInput("--kernel ", android.PathForModuleSrc(ctx, kernel))
+		if k := android.PathForModuleSrc(ctx, kernel); k != nil {
+			cmd.FlagWithInput("--kernel ", k)
+		}
 	}
 
 	dtbName := proptools.String(b.properties.Dtb_prebuilt)
 	if dtbName != "" {
-		dtb := android.PathForModuleSrc(ctx, dtbName)
-		cmd.FlagWithInput("--dtb ", dtb)
+		if dtb := android.PathForModuleSrc(ctx, dtbName); dtb != nil {
+			cmd.FlagWithInput("--dtb ", dtb)
+		}
 	}
 
 	cmdline := strings.Join(b.properties.Cmdline, " ")
@@ -200,7 +203,9 @@ func (b *bootimg) buildBootImage(ctx android.ModuleContext, vendor bool) android
 			ctx.PropertyErrorf("bootconfig", "requires header_version: 4 or later")
 			return output
 		}
-		cmd.FlagWithInput("--vendor_bootconfig ", android.PathForModuleSrc(ctx, bootconfig))
+		if bc := android.PathForModuleSrc(ctx, bootconfig); bc != nil {
+			cmd.FlagWithInput("--vendor_bootconfig ", bc)
+		}
 	}
 
 	flag := "--output "
@@ -253,7 +258,9 @@ func (b *bootimg) buildPropFile(ctx android.ModuleContext) (propFile android.Out
 	algorithm := proptools.StringDefault(b.properties.Avb_algorithm, "SHA256_RSA4096")
 	addStr("avb_algorithm", algorithm)
 	key := android.PathForModuleSrc(ctx, proptools.String(b.properties.Avb_private_key))
-	addPath("avb_key_path", key)
+	if key != nil {
+		addPath("avb_key_path", key)
+	}
 	addStr("avb_add_hash_footer_args", "") // TODO(jiyong): add --rollback_index
 	partitionName := proptools.StringDefault(b.properties.Partition_name, b.Name())
 	addStr("partition_name", partitionName)

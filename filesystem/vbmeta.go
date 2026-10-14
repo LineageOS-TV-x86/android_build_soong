@@ -133,6 +133,15 @@ func (v *vbmeta) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	cmd := builder.Command().BuiltTool("avbtool").Text("make_vbmeta_image")
 
 	key := android.PathForModuleSrc(ctx, proptools.String(v.properties.Private_key))
+	if key == nil {
+		if ctx.Config().AllowMissingDependencies() {
+			builder.Command().Text("touch").Output(v.output)
+			builder.Build("vbmeta", fmt.Sprintf("vbmeta %s (missing key)", ctx.ModuleName()))
+			v.installDir = android.PathForModuleInstall(ctx, "etc")
+			ctx.InstallFile(v.installDir, v.installFileName(), v.output)
+			return
+		}
+	}
 	cmd.FlagWithInput("--key ", key)
 
 	algorithm := proptools.StringDefault(v.properties.Algorithm, "SHA256_RSA4096")
@@ -169,6 +178,9 @@ func (v *vbmeta) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		}
 		signedImage := f.SignedOutputPath()
 		if signedImage == nil {
+			if ctx.Config().AllowMissingDependencies() {
+				continue
+			}
 			ctx.PropertyErrorf("partitions", "%q(type: %s) is not signed. Use `use_avb: true`",
 				p.Name(), ctx.OtherModuleType(p))
 			continue
@@ -195,6 +207,11 @@ func (v *vbmeta) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		} else {
 			publicKey = extractedPublicKeys[name]
 		}
+		if publicKey == nil {
+			if ctx.Config().AllowMissingDependencies() {
+				continue
+			}
+		}
 		cmd.FlagWithArg("--chain_partition ", fmt.Sprintf("%s:%d:%s", name, ril, publicKey.String()))
 		cmd.Implicit(publicKey)
 	}
@@ -218,7 +235,11 @@ func (v *vbmeta) rollbackIndexCommand(ctx android.ModuleContext) string {
 	var cmd string
 	if v.properties.Rollback_index_file != nil {
 		f := android.PathForModuleSrc(ctx, proptools.String(v.properties.Rollback_index_file))
-		cmd = "cat " + f.String()
+		if f != nil {
+			cmd = "cat " + f.String()
+		} else {
+			cmd = "echo 0"
+		}
 	} else {
 		cmd = "date -d 'TZ=\"GMT\" " + ctx.Config().PlatformSecurityPatch() + "' +%s"
 	}
@@ -232,6 +253,7 @@ func (v *vbmeta) extractPublicKeys(ctx android.ModuleContext) map[string]android
 	result := make(map[string]android.OutputPath)
 
 	builder := android.NewRuleBuilder(pctx, ctx)
+	hasCommands := false
 	for _, cp := range v.properties.Chained_partitions {
 		if cp.Private_key == nil {
 			continue
@@ -250,16 +272,27 @@ func (v *vbmeta) extractPublicKeys(ctx android.ModuleContext) map[string]android
 
 		privateKeyFile := android.PathForModuleSrc(ctx, proptools.String(cp.Private_key))
 		publicKeyFile := android.PathForModuleOut(ctx, name+".avbpubkey").OutputPath
+		if privateKeyFile == nil {
+			if ctx.Config().AllowMissingDependencies() {
+				builder.Command().Text("touch").Output(publicKeyFile)
+				hasCommands = true
+				result[name] = publicKeyFile
+				continue
+			}
+		}
 
 		builder.Command().
 			BuiltTool("avbtool").
 			Text("extract_public_key").
 			FlagWithInput("--key ", privateKeyFile).
 			FlagWithOutput("--output ", publicKeyFile)
+		hasCommands = true
 
 		result[name] = publicKeyFile
 	}
-	builder.Build("vbmeta_extract_public_key", fmt.Sprintf("Extract public keys for %s", ctx.ModuleName()))
+	if hasCommands {
+		builder.Build("vbmeta_extract_public_key", fmt.Sprintf("Extract public keys for %s", ctx.ModuleName()))
+	}
 	return result
 }
 
