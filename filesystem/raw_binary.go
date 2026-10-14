@@ -75,6 +75,20 @@ func (r *rawBinary) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	inputFile := android.PathForModuleSrc(ctx, proptools.String(r.properties.Src))
 	outputFile := android.PathForModuleOut(ctx, r.installFileName()).OutputPath
 
+	if inputFile == nil {
+		if ctx.Config().AllowMissingDependencies() {
+			ctx.Build(pctx, android.BuildParams{
+				Rule:        android.Touch,
+				Description: "raw binary " + outputFile.Base() + " (missing src)",
+				Output:      outputFile,
+			})
+			r.output = outputFile
+			r.installDir = android.PathForModuleInstall(ctx, "etc")
+			ctx.InstallFile(r.installDir, r.installFileName(), r.output)
+		}
+		return
+	}
+
 	ctx.Build(pctx, android.BuildParams{
 		Rule:        toRawBinary,
 		Description: "raw binary " + outputFile.Base(),
@@ -94,6 +108,9 @@ var _ android.AndroidMkEntriesProvider = (*rawBinary)(nil)
 
 // Implements android.AndroidMkEntriesProvider
 func (r *rawBinary) AndroidMkEntries() []android.AndroidMkEntries {
+	if r.output == nil {
+		return []android.AndroidMkEntries{{Disabled: true}}
+	}
 	return []android.AndroidMkEntries{{
 		Class:      "ETC",
 		OutputFile: android.OptionalPathForPath(r.output),

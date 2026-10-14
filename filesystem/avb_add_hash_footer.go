@@ -98,6 +98,13 @@ func (a *avbAddHashFooter) GenerateAndroidBuildActions(ctx android.ModuleContext
 	}
 	input := android.PathForModuleSrc(ctx, proptools.String(a.properties.Src))
 	if input == nil {
+		if ctx.Config().AllowMissingDependencies() {
+			a.output = android.PathForModuleOut(ctx, a.installFileName()).OutputPath
+			builder.Command().Text("touch").Output(a.output)
+			builder.Build("avbAddHashFooter", fmt.Sprintf("avbAddHashFooter %s (missing src)", ctx.ModuleName()))
+			a.installDir = android.PathForModuleInstall(ctx, "etc")
+			ctx.InstallFile(a.installDir, a.installFileName(), a.output)
+		}
 		return
 	}
 	a.output = android.PathForModuleOut(ctx, a.installFileName()).OutputPath
@@ -188,6 +195,9 @@ var _ android.AndroidMkEntriesProvider = (*avbAddHashFooter)(nil)
 
 // Implements android.AndroidMkEntriesProvider
 func (a *avbAddHashFooter) AndroidMkEntries() []android.AndroidMkEntries {
+	if a.output == nil {
+		return []android.AndroidMkEntries{android.AndroidMkEntries{Disabled: true}}
+	}
 	return []android.AndroidMkEntries{android.AndroidMkEntries{
 		Class:      "ETC",
 		OutputFile: android.OptionalPathForPath(a.output),

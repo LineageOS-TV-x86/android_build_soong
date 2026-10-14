@@ -71,6 +71,13 @@ func (a *avbGenVbmetaImage) GenerateAndroidBuildActions(ctx android.ModuleContex
 	}
 	input := android.PathForModuleSrc(ctx, proptools.String(a.properties.Src))
 	if input == nil {
+		if ctx.Config().AllowMissingDependencies() {
+			a.output = android.PathForModuleOut(ctx, a.installFileName()).OutputPath
+			builder.Command().Text("touch").Output(a.output)
+			builder.Build("avbGenVbmetaImage", fmt.Sprintf("avbGenVbmetaImage %s (missing src)", ctx.ModuleName()))
+			a.installDir = android.PathForModuleInstall(ctx, "etc")
+			ctx.InstallFile(a.installDir, a.installFileName(), a.output)
+		}
 		return
 	}
 	cmd.FlagWithInput("--image ", input)
@@ -90,6 +97,9 @@ var _ android.AndroidMkEntriesProvider = (*avbGenVbmetaImage)(nil)
 
 // Implements android.AndroidMkEntriesProvider
 func (a *avbGenVbmetaImage) AndroidMkEntries() []android.AndroidMkEntries {
+	if a.output == nil {
+		return []android.AndroidMkEntries{android.AndroidMkEntries{Disabled: true}}
+	}
 	return []android.AndroidMkEntries{android.AndroidMkEntries{
 		Class:      "ETC",
 		OutputFile: android.OptionalPathForPath(a.output),
