@@ -295,14 +295,18 @@ func (f *filesystem) buildImageUsingBuildImage(ctx android.ModuleContext) androi
 	return output
 }
 
-func (f *filesystem) buildFileContexts(ctx android.ModuleContext) android.OutputPath {
+func (f *filesystem) buildFileContexts(ctx android.ModuleContext) (android.OutputPath, bool) {
+	src := android.PathForModuleSrc(ctx, proptools.String(f.properties.File_contexts))
+	if src == nil {
+		return android.OutputPath{}, false
+	}
 	builder := android.NewRuleBuilder(pctx, ctx)
 	fcBin := android.PathForModuleOut(ctx, "file_contexts.bin")
 	builder.Command().BuiltTool("sefcontext_compile").
 		FlagWithOutput("-o ", fcBin).
-		Input(android.PathForModuleSrc(ctx, proptools.String(f.properties.File_contexts)))
+		Input(src)
 	builder.Build("build_filesystem_file_contexts", fmt.Sprintf("Creating filesystem file contexts for %s", f.BaseModuleName()))
-	return fcBin.OutputPath
+	return fcBin.OutputPath, true
 }
 
 // Calculates avb_salt from entry list (sorted) for deterministic output.
@@ -351,7 +355,9 @@ func (f *filesystem) buildPropFile(ctx android.ModuleContext) (propFile android.
 		algorithm := proptools.StringDefault(f.properties.Avb_algorithm, "SHA256_RSA4096")
 		addStr("avb_algorithm", algorithm)
 		key := android.PathForModuleSrc(ctx, proptools.String(f.properties.Avb_private_key))
-		addPath("avb_key_path", key)
+		if key != nil {
+			addPath("avb_key_path", key)
+		}
 		partitionName := proptools.StringDefault(f.properties.Partition_name, f.Name())
 		addStr("partition_name", partitionName)
 		avb_add_hashtree_footer_args := "--do_not_generate_fec"
@@ -366,7 +372,9 @@ func (f *filesystem) buildPropFile(ctx android.ModuleContext) (propFile android.
 	}
 
 	if proptools.String(f.properties.File_contexts) != "" {
-		addPath("selinux_fc", f.buildFileContexts(ctx))
+		if fc, ok := f.buildFileContexts(ctx); ok {
+			addPath("selinux_fc", fc)
+		}
 	}
 	if timestamp := proptools.String(f.properties.Fake_timestamp); timestamp != "" {
 		addStr("timestamp", timestamp)
