@@ -269,6 +269,19 @@ var (
 // TODO(jiyong): make this to return paths instead of directly storing the paths to apexBundle
 func (a *apexBundle) buildManifest(ctx android.ModuleContext, provideNativeLibs, requireNativeLibs []string) {
 	src := android.PathForModuleSrc(ctx, proptools.StringDefault(a.properties.Manifest, "apex_manifest.json"))
+	if src == nil {
+		if ctx.Config().AllowMissingDependencies() {
+			var unusedPath = android.PathForModuleOut(ctx, "nonexistentmanifest")
+			ctx.Build(pctx, android.BuildParams{
+				Rule:   android.ErrorRule,
+				Output: unusedPath,
+				Args: map[string]string{
+					"error": "Manifest not available",
+				},
+			})
+			src = unusedPath
+		}
+	}
 
 	// Put dependency({provide|require}NativeLibs) in apex_manifest.json
 	provideNativeLibs = android.SortedUniqueStrings(provideNativeLibs)
@@ -366,22 +379,34 @@ func (a *apexBundle) buildFileContexts(ctx android.ModuleContext) android.Output
 		if m, t := android.SrcIsModuleWithTag(*a.properties.File_contexts); m != "" {
 			isFileContextsModule = true
 			otherModule := android.GetModuleFromPathDep(ctx, m, t)
-			fileContextsDir = ctx.OtherModuleDir(otherModule)
+			if otherModule != nil {
+				fileContextsDir = ctx.OtherModuleDir(otherModule)
+			}
 		}
 		fileContexts = android.PathForModuleSrc(ctx, *a.properties.File_contexts)
 	}
-	if fileContextsDir == "" {
+	if fileContextsDir == "" && fileContexts != nil {
 		fileContextsDir = filepath.Dir(fileContexts.String())
 	}
-	fileContextsDir += string(filepath.Separator)
+	if fileContextsDir != "" {
+		fileContextsDir += string(filepath.Separator)
+	}
 
-	if a.Platform() {
+	if a.Platform() && fileContextsDir != "" {
 		if !strings.HasPrefix(fileContextsDir, "system/sepolicy/") {
 			ctx.PropertyErrorf("file_contexts", "should be under system/sepolicy, but found in  %q", fileContextsDir)
 		}
 	}
-	if !isFileContextsModule && !android.ExistentPathForSource(ctx, fileContexts.String()).Valid() {
-		ctx.PropertyErrorf("file_contexts", "cannot find file_contexts file: %q", fileContexts.String())
+	if !isFileContextsModule {
+		if fileContexts == nil || !android.ExistentPathForSource(ctx, fileContexts.String()).Valid() {
+			if !ctx.Config().AllowMissingDependencies() {
+				if fileContexts != nil {
+					ctx.PropertyErrorf("file_contexts", "cannot find file_contexts file: %q", fileContexts.String())
+				} else {
+					ctx.PropertyErrorf("file_contexts", "cannot find file_contexts file")
+				}
+			}
+		}
 	}
 
 	useFileContextsAsIs := proptools.Bool(a.properties.Use_file_contexts_as_is)
@@ -398,8 +423,12 @@ func (a *apexBundle) buildFileContexts(ctx android.ModuleContext) android.Output
 	}
 	// remove old file
 	rule.Command().Text("rm").FlagWithOutput("-f ", output)
-	// copy file_contexts
-	rule.Command().Text("cat").Input(fileContexts).Text(">>").Output(output)
+	if fileContexts != nil && (isFileContextsModule || android.ExistentPathForSource(ctx, fileContexts.String()).Valid()) {
+		// copy file_contexts
+		rule.Command().Text("cat").Input(fileContexts).Text(">>").Output(output)
+	} else {
+		rule.Command().Text("touch").Output(output)
+	}
 	// new line
 	rule.Command().Text("echo").Text(">>").Output(output)
 	if !useFileContextsAsIs {
@@ -625,19 +654,21 @@ func (a *apexBundle) buildApex(ctx android.ModuleContext) {
 
 		// Compare content.txt against allowed_files.
 		allowedFilesFile := android.PathForModuleSrc(ctx, proptools.String(a.overridableProperties.Allowed_files))
-		phonyOutput := android.PathForModuleOut(ctx, a.Name()+"-diff-phony-output")
-		ctx.Build(pctx, android.BuildParams{
-			Rule:        diffApexContentRule,
-			Implicits:   implicitInputs,
-			Output:      phonyOutput,
-			Description: "diff apex image content",
-			Args: map[string]string{
-				"allowed_files_file": allowedFilesFile.String(),
-				"image_content_file": imageContentFile.String(),
-				"apex_module_name":   a.Name(),
-			},
-		})
-		implicitInputs = append(implicitInputs, phonyOutput)
+		if allowedFilesFile != nil {
+			phonyOutput := android.PathForModuleOut(ctx, a.Name()+"-diff-phony-output")
+			ctx.Build(pctx, android.BuildParams{
+				Rule:        diffApexContentRule,
+				Implicits:   implicitInputs,
+				Output:      phonyOutput,
+				Description: "diff apex image content",
+				Args: map[string]string{
+					"allowed_files_file": allowedFilesFile.String(),
+					"image_content_file": imageContentFile.String(),
+					"apex_module_name":   a.Name(),
+				},
+			})
+			implicitInputs = append(implicitInputs, phonyOutput)
+		}
 	}
 
 	unsignedOutputFile := android.PathForModuleOut(ctx, a.Name()+suffix+".unsigned")
@@ -706,13 +737,15 @@ func (a *apexBundle) buildApex(ctx android.ModuleContext) {
 
 	if a.properties.AndroidManifest != nil {
 		androidManifestFile := android.PathForModuleSrc(ctx, proptools.String(a.properties.AndroidManifest))
-
-		if a.testApex {
-			androidManifestFile = markManifestTestOnly(ctx, androidManifestFile)
+		if androidManifestFile != nil {
+			if a.testApex {
+				androidManifestFile = markManifestTestOnly(ctx, androidManifestFile)
+			}
+			if androidManifestFile != nil {
+				implicitInputs = append(implicitInputs, androidManifestFile)
+				optFlags = append(optFlags, "--android_manifest "+androidManifestFile.String())
+			}
 		}
-
-		implicitInputs = append(implicitInputs, androidManifestFile)
-		optFlags = append(optFlags, "--android_manifest "+androidManifestFile.String())
 	} else if a.testApex {
 		optFlags = append(optFlags, "--test_only")
 	}
@@ -1196,7 +1229,9 @@ func (a *apexBundle) buildCannedFsConfig(ctx android.ModuleContext, defaultReadO
 	// Custom fs_config is "appended" to the last so that entries from the file are preferred
 	// over default ones set above.
 	if a.properties.Canned_fs_config != nil {
-		cmd.Text("cat").Input(android.PathForModuleSrc(ctx, *a.properties.Canned_fs_config))
+		if cannedFs := android.PathForModuleSrc(ctx, *a.properties.Canned_fs_config); cannedFs != nil {
+			cmd.Text("cat").Input(cannedFs)
+		}
 	}
 	cmd.Text(")").FlagWithOutput("> ", cannedFsConfig)
 	builder.Build("generateFsConfig", fmt.Sprintf("Generating canned fs config for %s", a.BaseModuleName()))

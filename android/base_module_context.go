@@ -229,13 +229,28 @@ type baseModuleContext struct {
 }
 
 func (b *baseModuleContext) OtherModuleName(m blueprint.Module) string {
+	if m == nil {
+		return ""
+	}
 	return b.bp.OtherModuleName(m)
 }
-func (b *baseModuleContext) OtherModuleDir(m blueprint.Module) string { return b.bp.OtherModuleDir(m) }
+func (b *baseModuleContext) OtherModuleDir(m blueprint.Module) string {
+	if m == nil {
+		return ""
+	}
+	return b.bp.OtherModuleDir(m)
+}
 func (b *baseModuleContext) OtherModuleErrorf(m blueprint.Module, fmt string, args ...interface{}) {
+	if m == nil {
+		b.ModuleErrorf(fmt, args...)
+		return
+	}
 	b.bp.OtherModuleErrorf(m, fmt, args...)
 }
 func (b *baseModuleContext) OtherModuleDependencyTag(m blueprint.Module) blueprint.DependencyTag {
+	if m == nil {
+		return nil
+	}
 	return b.bp.OtherModuleDependencyTag(m)
 }
 func (b *baseModuleContext) OtherModuleExists(name string) bool { return b.bp.OtherModuleExists(name) }
