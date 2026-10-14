@@ -83,6 +83,9 @@ func GenerateDexpreoptRule(ctx android.BuilderContext, globalSoong *GlobalSoongC
 
 	if !dexpreoptDisabled(ctx, global, module) {
 		if valid, err := validateClassLoaderContext(module.ClassLoaderContexts); err != nil {
+			if ctx.Config().AllowMissingDependencies() {
+				return rule, nil
+			}
 			android.ReportPathErrorf(ctx, err.Error())
 		} else if valid {
 			fixClassLoaderContext(module.ClassLoaderContexts)

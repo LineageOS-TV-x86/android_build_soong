@@ -570,7 +570,9 @@ func ComputeClassLoaderContextDependenciesRec(clcs []*ClassLoaderContext) (names
 	for _, clc := range clcs {
 		subNames, subPaths := ComputeClassLoaderContextDependenciesRec(clc.Subcontexts)
 		names = append(names, clc.Name)
-		paths = append(paths, clc.Host)
+		if clc.Host != nil {
+			paths = append(paths, clc.Host)
+		}
 		names = append(names, subNames...)
 		paths = append(paths, subPaths...)
 	}
