@@ -1,0 +1,15 @@
+cc_binary {
+    name: "pdlc",
+    host_supported: true,
+    srcs: ["pdlc.c"],
+}
+
+genrule_defaults { name: "pdl_rust_noalloc_generator_defaults", tools: [":pdlc", ":pdl_python_generator"] }
+genrule_defaults { name: "pdl_python_generator_defaults", tools: [":pdlc", ":pdl_python_generator"] }
+genrule_defaults { name: "pdl_rust_generator_defaults", tools: [":pdlc", ":pdl_python_generator"] }
+
+cc_binary {
+    name: "pdl_python_generator",
+    host_supported: true,
+    srcs: ["pdl_python_generator.c"],
+}

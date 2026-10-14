@@ -97,6 +97,9 @@ func (a *avbAddHashFooter) GenerateAndroidBuildActions(ctx android.ModuleContext
 		return
 	}
 	input := android.PathForModuleSrc(ctx, proptools.String(a.properties.Src))
+	if input == nil {
+		return
+	}
 	a.output = android.PathForModuleOut(ctx, a.installFileName()).OutputPath
 	builder.Command().Text("cp").Input(input).Output(a.output)
 
@@ -113,7 +116,9 @@ func (a *avbAddHashFooter) GenerateAndroidBuildActions(ctx android.ModuleContext
 	}
 
 	key := android.PathForModuleSrc(ctx, proptools.String(a.properties.Private_key))
-	cmd.FlagWithInput("--key ", key)
+	if key != nil {
+		cmd.FlagWithInput("--key ", key)
+	}
 
 	algorithm := proptools.StringDefault(a.properties.Algorithm, "SHA256_RSA4096")
 	cmd.FlagWithArg("--algorithm ", algorithm)
@@ -126,7 +131,9 @@ func (a *avbAddHashFooter) GenerateAndroidBuildActions(ctx android.ModuleContext
 
 	imagePaths := android.PathsForModuleSrc(ctx, a.properties.Include_descriptors_from_images)
 	for _, imagePath := range imagePaths {
-		cmd.FlagWithInput("--include_descriptors_from_image ", imagePath)
+		if imagePath != nil {
+			cmd.FlagWithInput("--include_descriptors_from_image ", imagePath)
+		}
 	}
 
 	for _, prop := range a.properties.Props {
@@ -170,8 +177,10 @@ func addAvbProp(ctx android.ModuleContext, cmd *android.RuleBuilderCommand, prop
 		cmd.FlagWithArg("--prop ", proptools.ShellEscape(fmt.Sprintf("%s:%s", name, value)))
 	} else {
 		p := android.PathForModuleSrc(ctx, file)
-		cmd.Implicit(p)
-		cmd.FlagWithArg("--prop_from_file ", proptools.ShellEscape(fmt.Sprintf("%s:%s", name, cmd.PathForInput(p))))
+		if p != nil {
+			cmd.Implicit(p)
+			cmd.FlagWithArg("--prop_from_file ", proptools.ShellEscape(fmt.Sprintf("%s:%s", name, cmd.PathForInput(p))))
+		}
 	}
 }
 

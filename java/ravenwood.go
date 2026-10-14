@@ -103,8 +103,8 @@ func (r *ravenwoodTest) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddVariationDependencies(nil, ravenwoodRuntimeTag, ravenwoodRuntimeName)
 
 	// Directly depend on any utils so that we link against them
-	utils := ctx.AddVariationDependencies(nil, ravenwoodUtilsTag, ravenwoodUtilsName)[0]
-	if utils != nil {
+	if deps := ctx.AddVariationDependencies(nil, ravenwoodUtilsTag, ravenwoodUtilsName); len(deps) > 0 && deps[0] != nil {
+		utils := deps[0]
 		for _, lib := range utils.(*ravenwoodLibgroup).ravenwoodLibgroupProperties.Libs {
 			ctx.AddVariationDependencies(nil, libTag, lib)
 		}
@@ -137,7 +137,12 @@ func (r *ravenwoodTest) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	// All JNI libraries included in the runtime
 	var runtimeJniModuleNames map[string]bool
 
-	if utils := ctx.GetDirectDepsWithTag(ravenwoodUtilsTag)[0]; utils != nil {
+	deps := ctx.GetDirectDepsWithTag(ravenwoodUtilsTag)
+	var utils android.Module
+	if len(deps) > 0 {
+		utils = deps[0]
+	}
+	if utils != nil {
 		for _, installFile := range utils.FilesToInstall() {
 			installDeps = append(installDeps, installFile)
 		}
@@ -257,7 +262,13 @@ func (r *ravenwoodLibgroup) GenerateAndroidBuildActions(ctx android.ModuleContex
 	installPath := android.PathForModuleInstall(ctx, r.BaseModuleName())
 	for _, lib := range r.ravenwoodLibgroupProperties.Libs {
 		libModule := ctx.GetDirectDepWithTag(lib, ravenwoodLibContentTag)
+		if libModule == nil {
+			continue
+		}
 		libJar := android.OutputFileForModule(ctx, libModule, "")
+		if libJar == nil {
+			continue
+		}
 		ctx.InstallFile(installPath, lib+".jar", libJar)
 	}
 	soInstallPath := android.PathForModuleInstall(ctx, r.BaseModuleName()).Join(ctx, getLibPath(r.forceArchType))

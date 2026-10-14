@@ -70,6 +70,9 @@ func (a *avbGenVbmetaImage) GenerateAndroidBuildActions(ctx android.ModuleContex
 		return
 	}
 	input := android.PathForModuleSrc(ctx, proptools.String(a.properties.Src))
+	if input == nil {
+		return
+	}
 	cmd.FlagWithInput("--image ", input)
 
 	if a.properties.Salt == nil {

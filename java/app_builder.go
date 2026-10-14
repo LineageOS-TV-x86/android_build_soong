@@ -284,6 +284,9 @@ func TransformJniLibsToJar(
 }
 
 func (a *AndroidApp) generateJavaUsedByApex(ctx android.ModuleContext) {
+	if a.Library.Module.outputFile == nil {
+		return
+	}
 	javaApiUsedByOutputFile := android.PathForModuleOut(ctx, a.installApkName+"_using.xml")
 	javaUsedByRule := android.NewRuleBuilder(pctx, ctx)
 	javaUsedByRule.Command().
