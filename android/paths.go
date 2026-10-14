@@ -1498,7 +1498,9 @@ func PathForModuleSrc(ctx ModuleMissingDepsPathContext, pathComponents ...string
 		}
 		return nil
 	} else if len(paths) == 0 {
-		ReportPathErrorf(ctx, "%q produced no files, expected exactly one", p)
+		if !ctx.Config().AllowMissingDependencies() {
+			ReportPathErrorf(ctx, "%q produced no files, expected exactly one", p)
+		}
 		return nil
 	} else if len(paths) > 1 {
 		ReportPathErrorf(ctx, "%q produced %d files, expected exactly one", p, len(paths))
