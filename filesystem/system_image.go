@@ -50,7 +50,7 @@ func (s *systemImage) buildExtraFiles(ctx android.ModuleContext, root android.Ou
 
 func (s *systemImage) buildLinkerConfigFile(ctx android.ModuleContext, root android.OutputPath) android.OutputPath {
 	output := root.Join(ctx, "system", "etc", "linker.config.pb")
-	if proptools.String(s.properties.Linker_config_src) == "" {
+	if android.String(s.properties.Linker_config_src) == "" {
 		return output
 	}
 	input := android.PathForModuleSrc(ctx, android.String(s.properties.Linker_config_src))
