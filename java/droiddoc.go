@@ -658,14 +658,18 @@ func (d *Droiddoc) doclavaDocsFlags(ctx android.ModuleContext, cmd *android.Rule
 
 	if len(d.properties.Html_dirs) > 0 {
 		htmlDir := android.PathForModuleSrc(ctx, d.properties.Html_dirs[0])
-		cmd.FlagWithArg("-htmldir ", htmlDir.String()).
-			Implicits(android.PathsForModuleSrc(ctx, []string{filepath.Join(d.properties.Html_dirs[0], "**/*")}))
+		if htmlDir != nil {
+			cmd.FlagWithArg("-htmldir ", htmlDir.String()).
+				Implicits(android.PathsForModuleSrc(ctx, []string{filepath.Join(d.properties.Html_dirs[0], "**/*")}))
+		}
 	}
 
 	if len(d.properties.Html_dirs) > 1 {
 		htmlDir2 := android.PathForModuleSrc(ctx, d.properties.Html_dirs[1])
-		cmd.FlagWithArg("-htmldir2 ", htmlDir2.String()).
-			Implicits(android.PathsForModuleSrc(ctx, []string{filepath.Join(d.properties.Html_dirs[1], "**/*")}))
+		if htmlDir2 != nil {
+			cmd.FlagWithArg("-htmldir2 ", htmlDir2.String()).
+				Implicits(android.PathsForModuleSrc(ctx, []string{filepath.Join(d.properties.Html_dirs[1], "**/*")}))
+		}
 	}
 
 	if len(d.properties.Html_dirs) > 2 {
@@ -691,14 +695,18 @@ func (d *Droiddoc) doclavaDocsFlags(ctx android.ModuleContext, cmd *android.Rule
 	}
 
 	if String(d.properties.Lint_baseline) != "" {
-		cmd.FlagWithInput("-lintbaseline ", android.PathForModuleSrc(ctx, String(d.properties.Lint_baseline)))
+		if lb := android.PathForModuleSrc(ctx, String(d.properties.Lint_baseline)); lb != nil {
+			cmd.FlagWithInput("-lintbaseline ", lb)
+		}
 	}
 
 	if String(d.properties.Resourcesdir) != "" {
 		// TODO: should we add files under resourcesDir to the implicits? It seems that
 		// resourcesDir is one sub dir of htmlDir
 		resourcesDir := android.PathForModuleSrc(ctx, String(d.properties.Resourcesdir))
-		cmd.FlagWithArg("-resourcesdir ", resourcesDir.String())
+		if resourcesDir != nil {
+			cmd.FlagWithArg("-resourcesdir ", resourcesDir.String())
+		}
 	}
 
 	if String(d.properties.Resourcesoutdir) != "" {
@@ -710,16 +718,20 @@ func (d *Droiddoc) doclavaDocsFlags(ctx android.ModuleContext, cmd *android.Rule
 func (d *Droiddoc) postDoclavaCmds(ctx android.ModuleContext, rule *android.RuleBuilder) {
 	if String(d.properties.Static_doc_index_redirect) != "" {
 		staticDocIndexRedirect := android.PathForModuleSrc(ctx, String(d.properties.Static_doc_index_redirect))
-		rule.Command().Text("cp").
-			Input(staticDocIndexRedirect).
-			Output(android.PathForModuleOut(ctx, "out", "index.html"))
+		if staticDocIndexRedirect != nil {
+			rule.Command().Text("cp").
+				Input(staticDocIndexRedirect).
+				Output(android.PathForModuleOut(ctx, "out", "index.html"))
+		}
 	}
 
 	if String(d.properties.Static_doc_properties) != "" {
 		staticDocProperties := android.PathForModuleSrc(ctx, String(d.properties.Static_doc_properties))
-		rule.Command().Text("cp").
-			Input(staticDocProperties).
-			Output(android.PathForModuleOut(ctx, "out", "source.properties"))
+		if staticDocProperties != nil {
+			rule.Command().Text("cp").
+				Input(staticDocProperties).
+				Output(android.PathForModuleOut(ctx, "out", "source.properties"))
+		}
 	}
 }
 
@@ -831,8 +843,9 @@ func (d *Droiddoc) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	d.expandArgs(ctx, cmd)
 
 	if d.properties.Compat_config != nil {
-		compatConfig := android.PathForModuleSrc(ctx, String(d.properties.Compat_config))
-		cmd.FlagWithInput("-compatconfig ", compatConfig)
+		if compatConfig := android.PathForModuleSrc(ctx, String(d.properties.Compat_config)); compatConfig != nil {
+			cmd.FlagWithInput("-compatconfig ", compatConfig)
+		}
 	}
 
 	var desc string

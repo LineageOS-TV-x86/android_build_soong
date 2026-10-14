@@ -532,12 +532,15 @@ func (d *Droidstubs) annotationsFlags(ctx android.ModuleContext, cmd *android.Ru
 		cmd.Flag(config.MetalavaAnnotationsFlags)
 
 		if params.migratingNullability {
-			previousApi := android.PathForModuleSrc(ctx, String(d.properties.Previous_api))
-			cmd.FlagWithInput("--migrate-nullness ", previousApi)
+			if previousApi := android.PathForModuleSrc(ctx, String(d.properties.Previous_api)); previousApi != nil {
+				cmd.FlagWithInput("--migrate-nullness ", previousApi)
+			}
 		}
 
 		if s := String(d.properties.Validate_nullability_from_list); s != "" {
-			cmd.FlagWithInput("--validate-nullability-from-list ", android.PathForModuleSrc(ctx, s))
+			if p := android.PathForModuleSrc(ctx, s); p != nil {
+				cmd.FlagWithInput("--validate-nullability-from-list ", p)
+			}
 		}
 
 		if params.validatingNullability {
@@ -680,10 +683,11 @@ func (d *Droidstubs) apiLevelsGenerationFlags(ctx android.ModuleContext, cmd *an
 		if extensions_dir == "" {
 			ctx.ModuleErrorf("extensions_info_file set, but no SDK extension dirs found")
 		}
-		info_file := android.PathForModuleSrc(ctx, *d.properties.Extensions_info_file)
-		cmd.Implicit(info_file)
-		cmd.FlagWithArg("--sdk-extensions-root ", extensions_dir)
-		cmd.FlagWithArg("--sdk-extensions-info ", info_file.String())
+		if info_file := android.PathForModuleSrc(ctx, *d.properties.Extensions_info_file); info_file != nil {
+			cmd.Implicit(info_file)
+			cmd.FlagWithArg("--sdk-extensions-root ", extensions_dir)
+			cmd.FlagWithArg("--sdk-extensions-info ", info_file.String())
+		}
 	}
 }
 
@@ -1260,32 +1264,33 @@ func (d *Droidstubs) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		}
 
 		checkNullabilityWarnings := android.PathForModuleSrc(ctx, String(d.properties.Check_nullability_warnings))
+		if checkNullabilityWarnings != nil {
+			d.checkNullabilityWarningsTimestamp = android.PathForModuleOut(ctx, Everything.String(), "check_nullability_warnings.timestamp")
 
-		d.checkNullabilityWarningsTimestamp = android.PathForModuleOut(ctx, Everything.String(), "check_nullability_warnings.timestamp")
+			msg := fmt.Sprintf(`\n******************************\n`+
+				`The warnings encountered during nullability annotation validation did\n`+
+				`not match the checked in file of expected warnings. The diffs are shown\n`+
+				`above. You have two options:\n`+
+				`   1. Resolve the differences by editing the nullability annotations.\n`+
+				`   2. Update the file of expected warnings by running:\n`+
+				`         cp %s %s\n`+
+				`       and submitting the updated file as part of your change.`,
+				d.everythingArtifacts.nullabilityWarningsFile, checkNullabilityWarnings)
 
-		msg := fmt.Sprintf(`\n******************************\n`+
-			`The warnings encountered during nullability annotation validation did\n`+
-			`not match the checked in file of expected warnings. The diffs are shown\n`+
-			`above. You have two options:\n`+
-			`   1. Resolve the differences by editing the nullability annotations.\n`+
-			`   2. Update the file of expected warnings by running:\n`+
-			`         cp %s %s\n`+
-			`       and submitting the updated file as part of your change.`,
-			d.everythingArtifacts.nullabilityWarningsFile, checkNullabilityWarnings)
+			rule := android.NewRuleBuilder(pctx, ctx)
 
-		rule := android.NewRuleBuilder(pctx, ctx)
+			rule.Command().
+				Text("(").
+				Text("diff").Input(checkNullabilityWarnings).Input(d.everythingArtifacts.nullabilityWarningsFile).
+				Text("&&").
+				Text("touch").Output(d.checkNullabilityWarningsTimestamp).
+				Text(") || (").
+				Text("echo").Flag("-e").Flag(`"` + msg + `"`).
+				Text("; exit 38").
+				Text(")")
 
-		rule.Command().
-			Text("(").
-			Text("diff").Input(checkNullabilityWarnings).Input(d.everythingArtifacts.nullabilityWarningsFile).
-			Text("&&").
-			Text("touch").Output(d.checkNullabilityWarningsTimestamp).
-			Text(") || (").
-			Text("echo").Flag("-e").Flag(`"` + msg + `"`).
-			Text("; exit 38").
-			Text(")")
-
-		rule.Build("nullabilityWarningsCheck", "nullability warnings check")
+			rule.Build("nullabilityWarningsCheck", "nullability warnings check")
+		}
 	}
 	android.CollectDependencyAconfigFiles(ctx, &d.mergedAconfigFiles)
 }
