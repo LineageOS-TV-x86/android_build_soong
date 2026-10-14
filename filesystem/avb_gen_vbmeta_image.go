@@ -97,7 +97,7 @@ var _ android.AndroidMkEntriesProvider = (*avbGenVbmetaImage)(nil)
 
 // Implements android.AndroidMkEntriesProvider
 func (a *avbGenVbmetaImage) AndroidMkEntries() []android.AndroidMkEntries {
-	if a.output == nil {
+	if !a.output.Valid() {
 		return []android.AndroidMkEntries{android.AndroidMkEntries{Disabled: true}}
 	}
 	return []android.AndroidMkEntries{android.AndroidMkEntries{
