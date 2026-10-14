@@ -606,7 +606,7 @@ func (a *AndroidApp) dexBuildActions(ctx android.ModuleContext) (android.Path, a
 		}
 
 		a.Module.compile(ctx, extraSrcJars, extraClasspathJars, extraCombinedJars)
-		if Bool(a.dexProperties.Optimize.Shrink_resources) {
+		if Bool(a.dexProperties.Optimize.Shrink_resources) && a.dexer.resourcesOutput.Valid() {
 			binaryResources := android.PathForModuleOut(ctx, packageResources.Base()+".binary.out.apk")
 			aapt2Convert(ctx, binaryResources, a.dexer.resourcesOutput.Path(), "binary")
 			packageResources = binaryResources
