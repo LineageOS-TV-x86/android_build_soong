@@ -303,6 +303,12 @@ func PrebuiltLibraryFactory() android.Module {
 	// Prebuilt shared libraries can be included in APEXes
 	android.InitApexModule(module)
 
+	module.sdkMemberTypes = []android.SdkMemberType{
+		sharedLibrarySdkMemberType,
+		staticLibrarySdkMemberType,
+		staticAndSharedLibrarySdkMemberType,
+	}
+
 	return module.Init()
 }
 
@@ -330,6 +336,8 @@ func NewPrebuiltSharedLibrary(hod android.HostOrDeviceSupported) (*Module, *libr
 	// Prebuilt shared libraries can be included in APEXes
 	android.InitApexModule(module)
 
+	module.sdkMemberTypes = []android.SdkMemberType{sharedLibrarySdkMemberType}
+
 	return module, library
 }
 
@@ -343,6 +351,8 @@ func PrebuiltStaticLibraryFactory() android.Module {
 func NewPrebuiltStaticLibrary(hod android.HostOrDeviceSupported) (*Module, *libraryDecorator) {
 	module, library := NewPrebuiltLibrary(hod, "srcs")
 	library.BuildOnlyStatic()
+
+	module.sdkMemberTypes = []android.SdkMemberType{staticLibrarySdkMemberType}
 
 	return module, library
 }
