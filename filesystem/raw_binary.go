@@ -108,7 +108,7 @@ var _ android.AndroidMkEntriesProvider = (*rawBinary)(nil)
 
 // Implements android.AndroidMkEntriesProvider
 func (r *rawBinary) AndroidMkEntries() []android.AndroidMkEntries {
-	if !r.output.Valid() {
+	if r.output == (android.OutputPath{}) {
 		return []android.AndroidMkEntries{{Disabled: true}}
 	}
 	return []android.AndroidMkEntries{{
