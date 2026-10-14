@@ -99,7 +99,7 @@ func (library *Library) AndroidMkEntries() []android.AndroidMkEntries {
 						entries.AddStrings("LOCAL_LOGTAGS_FILES", logtags...)
 					}
 
-					if library.installFile == nil {
+					if library.installFile == nil || !library.dexJarFile.IsSet() {
 						entries.SetBoolIfTrue("LOCAL_UNINSTALLABLE_MODULE", true)
 					}
 					if library.dexJarFile.IsSet() {
@@ -215,7 +215,7 @@ func (prebuilt *Import) AndroidMkEntries() []android.AndroidMkEntries {
 		Include:      "$(BUILD_SYSTEM)/soong_java_prebuilt.mk",
 		ExtraEntries: []android.AndroidMkExtraEntriesFunc{
 			func(ctx android.AndroidMkExtraEntriesContext, entries *android.AndroidMkEntries) {
-				entries.SetBool("LOCAL_UNINSTALLABLE_MODULE", !Bool(prebuilt.properties.Installable))
+				entries.SetBool("LOCAL_UNINSTALLABLE_MODULE", !Bool(prebuilt.properties.Installable) || !prebuilt.dexJarFile.IsSet())
 				if prebuilt.dexJarFile.IsSet() {
 					entries.SetPath("LOCAL_SOONG_DEX_JAR", prebuilt.dexJarFile.Path())
 				}
