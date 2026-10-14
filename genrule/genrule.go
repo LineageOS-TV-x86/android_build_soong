@@ -359,7 +359,11 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 	for _, toolFile := range g.properties.Tool_files {
 		paths := android.PathsForModuleSrc(ctx, []string{toolFile})
 		tools = append(tools, paths...)
-		addLocationLabel(toolFile, toolLocation{paths})
+		if len(paths) == 0 && ctx.Config().AllowMissingDependencies() {
+			addLocationLabel(toolFile, errorLocation{"***missing tool_file " + toolFile + "***"})
+		} else {
+			addLocationLabel(toolFile, toolLocation{paths})
+		}
 	}
 
 	addLabelsForInputs := func(propName string, include, exclude []string) android.Paths {
@@ -459,6 +463,9 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 				loc := locationLabels[firstLabel]
 				paths := loc.Paths(cmd)
 				if len(paths) == 0 {
+					if ctx.Config().AllowMissingDependencies() {
+						return proptools.ShellEscape("***missing " + firstLabel + "***"), nil
+					}
 					return reportError("default label %q has no files", firstLabel)
 				} else if len(paths) > 1 {
 					return reportError("default label %q has multiple files, use $(locations %s) to reference it",
@@ -481,6 +488,9 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 					if loc, ok := locationLabels[label]; ok {
 						paths := loc.Paths(cmd)
 						if len(paths) == 0 {
+							if ctx.Config().AllowMissingDependencies() {
+								return proptools.ShellEscape("***missing " + label + "***"), nil
+							}
 							return reportError("label %q has no files", label)
 						} else if len(paths) > 1 {
 							return reportError("label %q has multiple files, use $(locations %s) to reference it",
@@ -495,6 +505,9 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 					if loc, ok := locationLabels[label]; ok {
 						paths := loc.Paths(cmd)
 						if len(paths) == 0 {
+							if ctx.Config().AllowMissingDependencies() {
+								return proptools.ShellEscape("***missing " + label + "***"), nil
+							}
 							return reportError("label %q has no files", label)
 						}
 						return strings.Join(proptools.ShellEscapeList(paths), " "), nil
