@@ -348,7 +348,7 @@ func (s *sdk) buildSnapshot(ctx android.ModuleContext, sdkVariants []*sdk) {
 	}
 
 	for _, memberVariantDep := range memberVariantDeps {
-		name := memberVariantDep.variant.Name()
+		name := ctx.OtherModuleName(memberVariantDep.variant)
 		export := memberVariantDep.export
 
 		// If the minApiLevel of the member is greater than the target API level then exclude it from
@@ -362,6 +362,9 @@ func (s *sdk) buildSnapshot(ctx android.ModuleContext, sdkVariants []*sdk) {
 		}
 
 		addMember(name, export, exclude)
+		if variantName := memberVariantDep.variant.Name(); variantName != name {
+			addMember(variantName, export, exclude)
+		}
 
 		// Add any components provided by the module.
 		for _, component := range memberVariantDep.exportedComponentsInfo.Components {
@@ -619,7 +622,7 @@ func (s *sdk) generateInfoData(ctx android.ModuleContext, memberVariantDeps []sd
 			list = v.([]string)
 		}
 
-		memberName := memberVariantDep.variant.Name()
+		memberName := ctx.OtherModuleName(memberVariantDep.variant)
 		list = append(list, memberName)
 		sdkInfo.memberSpecific[propertyName] = android.SortedUniqueStrings(list)
 
@@ -1225,7 +1228,9 @@ func (s *snapshotBuilder) OptionalSdkMemberReferencePropertyTag() android.BpProp
 func (s *snapshotBuilder) snapshotSdkMemberName(name string, required bool) string {
 	if _, ok := s.allMembersByName[name]; !ok {
 		if required {
-			s.ctx.ModuleErrorf("Required member reference %s is not a member of the sdk", name)
+			if !s.ctx.Config().AllowMissingDependencies() {
+				s.ctx.ModuleErrorf("Required member reference %s is not a member of the sdk", name)
+			}
 		}
 		return name
 	}
